@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Guardian - Live Demo</title>
+    <meta name="description" content="Network Guardian - Real-Time Network Monitoring Dashboard">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-main: #1e293b;
+            --bg-section: #334155;
+            --bg-card: #1e293b;
+            --text-primary: #fff;
+            --text-secondary: #94a3b8;
+            --border: #475569;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        
+        /* Demo Banner */
+        .demo-banner {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+        
+        .demo-banner a {
+            color: white;
+            text-decoration: underline;
+            margin-left: 10px;
+        }
+        
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        .header {
+            background: var(--bg-section);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 { margin: 0 0 10px 0; }
+        .status-text { color: var(--accent-blue); margin-top: 10px; font-weight: bold; }
+        
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-box {
+            background: var(--bg-section);
+            padding: 20px;
+            border-radius: 10px;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            margin-top: 5px;
+            font-size: 0.9em;
+        }
+        
+        .section {
+            background: var(--bg-section);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .section h2 {
+            margin: 0 0 20px 0;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+        }
+        
+        /* Network Topology Diagram */
+        .network-svg {
+            width: 100%;
+            height: 100%;
+            min-height: 580px;
+            display: block;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+        
+        .topology-container {
+            height: 100%;
+            min-height: 580px;
+        }
+        
+        /* Schools Grid */
+        .schools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .school-card {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-blue);
+        }
+        
+        .school-card.offline {
+            border-left-color: var(--accent-red);
+            opacity: 0.7;
+        }
+        
+        .school-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+        
+        .school-detail {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin: 4px 0;
+        }
+        
+        .badge-online {
+            background: var(--accent-green);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            display: inline-block;
+        }
+        
+        .badge-offline {
+            background: var(--accent-red);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            display: inline-block;
+        }
+        
+        button {
+            transition: opacity 0.2s ease;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        /* Map */
+        #map { 
+            height: 400px; 
+            border-radius: 8px; 
+            position: relative;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+        }
+        
+        /* Activity Logs */
+        .logs {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85em;
+            border: 1px solid var(--border);
+        }
+        
+        .log-line {
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .log-ok { color: var(--accent-green); font-weight: bold; }
+        .log-fail { color: var(--accent-red); font-weight: bold; }
+        
+        /* Settings Panel */
+        .settings-panel {
+            background: var(--bg-card);
+            border: 2px solid #06b6d4;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .settings-group {
+            background: var(--bg-section);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .settings-group h3 {
+            margin: 0 0 15px 0;
+            color: #06b6d4;
+        }
+        
+        label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        /* Service cards detailed */
+        .service-card {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--accent-blue);
+        }
+        
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .service-name { 
+            font-weight: bold; 
+            font-size: 1.1em; 
+        }
+        
+        .service-stats {
+            display: flex;
+            gap: 20px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* Heatmap */
+        .heatmap-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .heatmap-label {
+            width: 150px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .heatmap-cells {
+            display: flex;
+            gap: 3px;
+        }
+        
+        .heatmap-cell {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .heatmap-cell.ok { background: var(--accent-green); }
+        .heatmap-cell.slow { background: var(--accent-yellow); }
+        .heatmap-cell.down { background: var(--accent-red); }
+        
+        /* GitHub Button */
+        .github-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #24292e;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        .github-btn:hover {
+            transform: translateY(-3px);
+        }
+        
+        @media (max-width: 900px) {
+            .schools-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Demo Banner -->
+        <div class="demo-banner">
+            🎭 DEMO MODE - This is a live demonstration with simulated data. 
+            <a href="https://github.com/yourusername/network-guardian" target="_blank">Download on GitHub</a> to monitor your own network!
+        </div>
+        
+        <div class="header">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 10px;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);">
+                    🛡️
+                </div>
+                <div style="flex: 1; text-align: left;">
+                    <h1 style="margin: 0;">Network Guardian</h1>
+                    <div style="color: var(--text-secondary); font-size: 0.95em; margin-top: 5px;">
+                        Real-Time Network Monitoring Dashboard
+                    </div>
+                </div>
+            </div>
+            <div style="color: #10b981; font-size: 0.85em; margin-bottom: 5px; font-weight: 600;">
+                🔥 REAL PING MONITORING - Powered by Backend Server
+            </div>
+            <div style="color: #06b6d4; font-size: 0.85em; margin-bottom: 10px;">
+                ⚡ Professional Network Monitoring | V2.1
+            </div>
+            <div class="status-text">✅ System Running - 11/14 Locations Online</div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number">11/14</div>
+                <div class="stat-label">Locations Online</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">23ms</div>
+                <div class="stat-label">Avg Latency</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">4.2 Gbps</div>
+                <div class="stat-label">Total Bandwidth</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">99.2%</div>
+                <div class="stat-label">Uptime</div>
+            </div>
+        </div>
+        
+        <!-- CONTROLS -->
+        <div class="section" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button style="background: var(--accent-blue); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;" onclick="alert('Demo Mode: Speed test disabled')">🌐 Internet Speed Test</button>
+            <button style="background: var(--accent-yellow); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;" onclick="alert('Demo Mode: Local speed test disabled')">🏢 Local Speed Test</button>
+            <button style="background: #8b5cf6; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;" onclick="window.open('https://status.io', '_blank')">📡 Status Page</button>
+            <button style="background: var(--bg-card); color: white; border: 1px solid var(--border); padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;" onclick="toggleSettings()">⚙️ Settings</button>
+        </div>
+        
+        <!-- SETTINGS PANEL -->
+        <div id="settingsPanel" class="settings-panel hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">⚙️ Dashboard Settings</h2>
+                <button onclick="toggleSettings()" style="background: var(--accent-red); padding: 8px 15px; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">✖ Close</button>
+            </div>
+            
+            <div class="settings-grid">
+                <!-- Schools Toggle -->
+                <div class="settings-group">
+                    <h3>🏫 Campus Locations</h3>
+                    <label><input type="checkbox" checked> North Campus</label>
+                    <label><input type="checkbox" checked> South High School</label>
+                    <label><input type="checkbox" checked> Central School</label>
+                    <label><input type="checkbox" checked> East High School</label>
+                    <label><input type="checkbox" checked> West Junior High</label>
+                    <label><input type="checkbox" checked> Admin Building</label>
+                    <label><input type="checkbox" checked> District Core</label>
+                </div>
+                
+                <!-- Servers Toggle -->
+                <div class="settings-group">
+                    <h3>🖥️ Infrastructure Servers</h3>
+                    <label><input type="checkbox" checked> DNS Server 1</label>
+                    <label><input type="checkbox" checked> DNS Server 2</label>
+                    <label><input type="checkbox" checked> DNS Server 3</label>
+                    <label><input type="checkbox" checked> DNS Server 4</label>
+                    <label><input type="checkbox" checked> DNS Server 5</label>
+                    <label><input type="checkbox" checked> DNS Server 6</label>
+                    <label><input type="checkbox" checked> SMTP Server</label>
+                </div>
+                
+                <!-- Display Options -->
+                <div class="settings-group">
+                    <h3>🎨 Display Options</h3>
+                    <label><input type="checkbox" checked> Show Topology Map</label>
+                    <label><input type="checkbox" checked> Show Heatmap</label>
+                    <label><input type="checkbox" checked> Show Service Status</label>
+                    <label><input type="checkbox" checked> Show Activity Logs</label>
+                    <label><input type="checkbox" checked> Auto-refresh (30s)</label>
+                    <label><input type="checkbox" checked> Sound Alerts</label>
+                </div>
+                
+                <!-- Alert Settings -->
+                <div class="settings-group">
+                    <h3>🔔 Alert Settings</h3>
+                    <label><input type="checkbox" checked> Desktop Notifications</label>
+                    <label><input type="checkbox" checked> Email Alerts</label>
+                    <label><input type="checkbox" checked> Alert on Offline</label>
+                    <label><input type="checkbox" checked> Alert on Slow Connection</label>
+                    <label><input type="checkbox"> Alert on Recovery</label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ACTIVITY LOGS -->
+        <div class="section">
+            <h2>📋 Activity Logs <span style="color: var(--text-secondary); font-weight: normal;">(Demo Data)</span></h2>
+            <div class="logs">
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> North Campus - PING OK - 12ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> South High School - PING OK - 8ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> Central School - PING OK - 15ms</div>
+                <div class="log-line"><span class="log-fail">[10:45:23]</span> East High School - PING FAILED - Timeout</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> West Junior High - PING OK - 18ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> Admin Building - PING OK - 9ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> DNS Server 1 - PING OK - 2ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> DNS Server 2 - PING OK - 2ms</div>
+                <div class="log-line"><span class="log-fail">[10:45:23]</span> DNS Server 3 - PING FAILED - Timeout</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> DNS Server 4 - PING OK - 2ms</div>
+                <div class="log-line"><span class="log-fail">[10:45:23]</span> DNS Server 5 - PING FAILED - Timeout</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> DNS Server 6 - PING OK - 2ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> SMTP Server - PING OK - 3ms</div>
+                <div class="log-line"><span class="log-ok">[10:45:23]</span> District Core - PING OK - 5ms</div>
+                <div class="log-line" style="color: #06b6d4;">[10:45:23] ✓ Monitoring cycle complete - 11/14 online</div>
+            </div>
+        </div>
+        
+        <!-- SCHOOL LOCATIONS MAP -->
+        <div class="section">
+            <h2>🗺️ School Locations Map</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9em;">
+                💡 <strong>Interactive Map:</strong> Zoom and pan to explore campus locations
+            </p>
+            <div id="map"></div>
+        </div>
+        
+        <!-- SPEED TEST RESULTS -->
+        <div class="section">
+            <h2>⚡ Speed Test Results</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; text-align: center; border: 2px solid var(--accent-blue);">
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">Internet Download</div>
+                    <div style="font-size: 2.5em; font-weight: bold; color: var(--accent-blue);">942</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85em;">Mbps</div>
+                </div>
+                <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; text-align: center; border: 2px solid var(--accent-green);">
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">Internet Upload</div>
+                    <div style="font-size: 2.5em; font-weight: bold; color: var(--accent-green);">876</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85em;">Mbps</div>
+                </div>
+                <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; text-align: center; border: 2px solid var(--accent-yellow);">
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">Local Network</div>
+                    <div style="font-size: 2.5em; font-weight: bold; color: var(--accent-yellow);">2.1</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85em;">Gbps</div>
+                </div>
+                <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; text-align: center; border: 2px solid #06b6d4;">
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">Ping</div>
+                    <div style="font-size: 2.5em; font-weight: bold; color: #06b6d4;">8</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85em;">ms</div>
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-left: 4px solid var(--accent-green); border-radius: 6px;">
+                <span style="color: var(--accent-green); font-weight: 600;">✓ Last tested:</span>
+                <span style="color: var(--text-secondary);"> Today at 2:30 PM • Connection: Excellent</span>
+            </div>
+        </div>
+        
+        <!-- NETWORK TOPOLOGY -->
+        <div class="section">
+            <h2>🗺️ Network Topology Map</h2>
+            <div class="topology-container">
+                <svg class="network-svg" viewBox="0 0 700 580">
+                    <defs>
+                        <!-- Shadow filters -->
+                        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                            <feOffset dx="2" dy="2" result="offsetblur"/>
+                            <feComponentTransfer>
+                                <feFuncA type="linear" slope="0.3"/>
+                            </feComponentTransfer>
+                            <feMerge>
+                                <feMergeNode/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        
+                        <filter id="shadow-strong" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+                            <feOffset dx="0" dy="4" result="offsetblur"/>
+                            <feComponentTransfer>
+                                <feFuncA type="linear" slope="0.5"/>
+                            </feComponentTransfer>
+                            <feMerge>
+                                <feMergeNode/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                        
+                        <!-- Gradient for Internet Cloud -->
+                        <radialGradient id="cloudGradient">
+                            <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.3" />
+                        </radialGradient>
+                        
+                        <!-- Gradient for District Hub -->
+                        <radialGradient id="hubGradient">
+                            <stop offset="0%" style="stop-color:#34d399;stop-opacity:0.6" />
+                            <stop offset="100%" style="stop-color:#10b981;stop-opacity:0.3" />
+                        </radialGradient>
+                        
+                        <!-- Animations -->
+                        <style>
+                            @keyframes pulse {
+                                0%, 100% { opacity: 1; transform: scale(1); }
+                                50% { opacity: 0.6; transform: scale(1.1); }
+                            }
+                            
+                            @keyframes data-flow {
+                                0% { stroke-dashoffset: 20; }
+                                100% { stroke-dashoffset: 0; }
+                            }
+                            
+                            .status-indicator {
+                                animation: pulse 2s ease-in-out infinite;
+                            }
+                            
+                            .connection-line {
+                                stroke-dasharray: 5, 5;
+                                animation: data-flow 1s linear infinite;
+                            }
+                            
+                            .node-bg {
+                                transition: all 0.3s ease;
+                            }
+                            
+                            .node-bg:hover {
+                                filter: brightness(1.3);
+                                transform: scale(1.05);
+                            }
+                        </style>
+                    </defs>
+                    
+                    <!-- Internet Cloud -->
+                    <g filter="url(#shadow-strong)">
+                        <ellipse cx="350" cy="60" rx="100" ry="40" fill="url(#cloudGradient)" stroke="#3b82f6" stroke-width="3"/>
+                        <ellipse cx="320" cy="55" rx="30" ry="15" fill="rgba(96, 165, 250, 0.4)" stroke="#60a5fa" stroke-width="1.5"/>
+                        <ellipse cx="380" cy="55" rx="35" ry="18" fill="rgba(96, 165, 250, 0.3)" stroke="#60a5fa" stroke-width="1.5"/>
+                        <ellipse cx="350" cy="45" rx="25" ry="12" fill="rgba(147, 197, 253, 0.3)" stroke="#93c5fd" stroke-width="1"/>
+                        <text x="350" y="66" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">☁️ INTERNET</text>
+                    </g>
+                    
+                    <!-- Main Uplink Line -->
+                    <line class="connection-line" x1="350" y1="100" x2="350" y2="170" stroke="#3b82f6" stroke-width="4" opacity="0.8"/>
+                    
+                    <!-- District Office Hub -->
+                    <g filter="url(#shadow-strong)">
+                        <rect x="260" y="170" width="180" height="90" rx="12" fill="url(#hubGradient)" stroke="#10b981" stroke-width="4" opacity="0.3"/>
+                        <rect x="270" y="180" width="160" height="70" rx="10" fill="rgba(16, 185, 129, 0.4)" stroke="#10b981" stroke-width="3"/>
+                        <circle cx="290" cy="215" r="12" fill="rgba(52, 211, 153, 0.5)" stroke="#34d399" stroke-width="2"/>
+                        <text x="290" y="221" text-anchor="middle" fill="#fff" font-size="16" font-weight="bold">🏢</text>
+                        <text x="315" y="212" fill="#fff" font-size="13" font-weight="bold">District Core</text>
+                        <text x="315" y="228" fill="#d1fae5" font-size="10">Central Network Hub</text>
+                        <text x="315" y="242" fill="#a7f3d0" font-size="9" font-family="monospace">192.168.1.1</text>
+                        <circle cx="415" cy="215" r="6" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Connection lines to campuses -->
+                    <line class="connection-line" x1="280" y1="260" x2="90" y2="360" stroke="#10b981" stroke-width="3"/>
+                    <line class="connection-line" x1="310" y1="260" x2="200" y2="360" stroke="#10b981" stroke-width="3"/>
+                    <line class="connection-line" x1="340" y1="260" x2="310" y2="360" stroke="#10b981" stroke-width="3"/>
+                    <line class="connection-line" x1="360" y1="260" x2="420" y2="360" stroke="#ef4444" stroke-width="3"/>
+                    <line class="connection-line" x1="390" y1="260" x2="530" y2="360" stroke="#10b981" stroke-width="3"/>
+                    <line class="connection-line" x1="420" y1="260" x2="640" y2="360" stroke="#10b981" stroke-width="3"/>
+                    
+                    <!-- Campus 1: North -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="40" y="360" width="100" height="50" rx="8" fill="rgba(59, 130, 246, 0.4)" stroke="#3b82f6" stroke-width="3"/>
+                        <circle cx="60" cy="385" r="10" fill="rgba(59, 130, 246, 0.6)" stroke="#60a5fa" stroke-width="2"/>
+                        <text x="60" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="90" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">North</text>
+                        <text x="90" y="392" text-anchor="middle" fill="#bfdbfe" font-size="7">Campus</text>
+                        <circle cx="130" cy="370" r="5" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Campus 2: South -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="150" y="360" width="100" height="50" rx="8" fill="rgba(139, 92, 246, 0.4)" stroke="#8b5cf6" stroke-width="3"/>
+                        <circle cx="170" cy="385" r="10" fill="rgba(139, 92, 246, 0.6)" stroke="#a78bfa" stroke-width="2"/>
+                        <text x="170" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="200" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">South</text>
+                        <text x="200" y="392" text-anchor="middle" fill="#ddd6fe" font-size="7">High School</text>
+                        <circle cx="240" cy="370" r="5" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Campus 3: Central -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="260" y="360" width="100" height="50" rx="8" fill="rgba(245, 158, 11, 0.4)" stroke="#f59e0b" stroke-width="3"/>
+                        <circle cx="280" cy="385" r="10" fill="rgba(245, 158, 11, 0.6)" stroke="#fbbf24" stroke-width="2"/>
+                        <text x="280" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="310" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Central</text>
+                        <text x="310" y="392" text-anchor="middle" fill="#fef3c7" font-size="7">School</text>
+                        <circle cx="350" cy="370" r="5" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Campus 4: East (OFFLINE) -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="370" y="360" width="100" height="50" rx="8" fill="rgba(236, 72, 153, 0.4)" stroke="#ec4899" stroke-width="3"/>
+                        <circle cx="390" cy="385" r="10" fill="rgba(236, 72, 153, 0.6)" stroke="#f472b6" stroke-width="2"/>
+                        <text x="390" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="420" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">East</text>
+                        <text x="420" y="392" text-anchor="middle" fill="#fce7f3" font-size="7">High School</text>
+                        <circle cx="460" cy="370" r="5" fill="#ef4444" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Campus 5: West -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="480" y="360" width="100" height="50" rx="8" fill="rgba(6, 182, 212, 0.4)" stroke="#06b6d4" stroke-width="3"/>
+                        <circle cx="500" cy="385" r="10" fill="rgba(6, 182, 212, 0.6)" stroke="#22d3ee" stroke-width="2"/>
+                        <text x="500" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="530" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">West</text>
+                        <text x="530" y="392" text-anchor="middle" fill="#cffafe" font-size="7">Junior High</text>
+                        <circle cx="570" cy="370" r="5" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Campus 6: Admin -->
+                    <g filter="url(#shadow)" class="node-bg">
+                        <rect x="590" y="360" width="100" height="50" rx="8" fill="rgba(168, 85, 247, 0.4)" stroke="#a855f7" stroke-width="3"/>
+                        <circle cx="610" cy="385" r="10" fill="rgba(168, 85, 247, 0.6)" stroke="#c084fc" stroke-width="2"/>
+                        <text x="610" y="390" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">🏫</text>
+                        <text x="640" y="379" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">Admin</text>
+                        <text x="640" y="392" text-anchor="middle" fill="#f3e8ff" font-size="7">Building</text>
+                        <circle cx="680" cy="370" r="5" fill="#10b981" class="status-indicator"/>
+                    </g>
+                    
+                    <!-- Legend -->
+                    <g transform="translate(30, 500)">
+                        <rect x="-10" y="-20" width="360" height="60" rx="8" fill="rgba(30, 41, 59, 0.6)" stroke="rgba(148, 163, 184, 0.3)" stroke-width="2"/>
+                        <text x="0" y="0" fill="#fff" font-size="12" font-weight="bold">Connection Status:</text>
+                        <line x1="10" y1="20" x2="40" y2="20" stroke="#10b981" stroke-width="4" class="connection-line"/>
+                        <circle cx="50" cy="20" r="4" fill="#10b981"/>
+                        <text x="60" y="24" fill="#d1fae5" font-size="10" font-weight="600">Online & Fast</text>
+                        <line x1="160" y1="20" x2="190" y2="20" stroke="#f59e0b" stroke-width="4" class="connection-line"/>
+                        <circle cx="200" cy="20" r="4" fill="#f59e0b"/>
+                        <text x="210" y="24" fill="#fef3c7" font-size="10" font-weight="600">Slow</text>
+                        <line x1="260" y1="20" x2="290" y2="20" stroke="#ef4444" stroke-width="4"/>
+                        <circle cx="300" cy="20" r="4" fill="#ef4444"/>
+                        <text x="310" y="24" fill="#fecaca" font-size="10" font-weight="600">Offline</text>
+                    </g>
+                    
+                    <!-- Info Box -->
+                    <g transform="translate(380, 500)">
+                        <rect x="0" y="-20" width="280" height="60" rx="8" fill="rgba(30, 41, 59, 0.6)" stroke="rgba(148, 163, 184, 0.3)" stroke-width="2"/>
+                        <text x="10" y="0" fill="#94a3b8" font-size="9">💡 Live network monitoring</text>
+                        <text x="10" y="14" fill="#94a3b8" font-size="9">⚡ Updates every 30 seconds</text>
+                        <text x="10" y="28" fill="#94a3b8" font-size="9">🔄 Animated data flow indicators</text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- SERVICE STATUS MONITOR -->
+        <div class="section">
+            <h2>📡 Service Status Monitor</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9em;">
+                Live monitoring of critical district services and external platforms
+            </p>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Google Workspace</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>📧 Gmail • 📁 Drive • 📅 Calendar</span>
+                    <span>Uptime: 99.9%</span>
+                    <span>Response: 45ms</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Aeries Student Information System</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>👥 8,500 Students • 650 Staff</span>
+                    <span>Uptime: 99.8%</span>
+                    <span>Response: 120ms</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Infinite Campus LMS</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>📚 Learning Management System</span>
+                    <span>Uptime: 99.7%</span>
+                    <span>Response: 89ms</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-yellow);">
+                <div class="service-header">
+                    <div class="service-name">Clever SSO Portal</div>
+                    <span style="background: var(--accent-yellow); padding: 4px 12px; border-radius: 12px; font-size: 0.85em;">● DEGRADED</span>
+                </div>
+                <div class="service-stats">
+                    <span>🔐 Single Sign-On Authentication</span>
+                    <span>Uptime: 98.2%</span>
+                    <span>Response: 450ms (slow)</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Chromebook Management Console</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>💻 3,200 Managed Devices</span>
+                    <span>Uptime: 100%</span>
+                    <span>Response: 35ms</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">District WiFi Network</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>📡 42 Access Points • 2,100 Connected</span>
+                    <span>Uptime: 99.5%</span>
+                    <span>Avg Speed: 450 Mbps</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Print Management System</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>🖨️ 85 Network Printers</span>
+                    <span>Uptime: 99.3%</span>
+                    <span>Queue: 0 jobs</span>
+                </div>
+            </div>
+            
+            <div class="service-card" style="border-left-color: var(--accent-green);">
+                <div class="service-header">
+                    <div class="service-name">Security Camera System</div>
+                    <span class="badge-online">● OPERATIONAL</span>
+                </div>
+                <div class="service-stats">
+                    <span>📹 156 Cameras • 24/7 Recording</span>
+                    <span>Uptime: 99.9%</span>
+                    <span>Storage: 78% used</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- BANDWIDTH HEATMAP -->
+        <div class="section">
+            <h2>📊 24-Hour Bandwidth Heatmap</h2>
+            <div style="margin-bottom: 15px;">
+                <div class="heatmap-row">
+                    <div class="heatmap-label">North Campus</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell slow"></div>
+                        <div class="heatmap-cell slow"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell slow"></div>
+                    </div>
+                </div>
+                <div class="heatmap-row">
+                    <div class="heatmap-label">South Campus</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                    </div>
+                </div>
+                <div class="heatmap-row">
+                    <div class="heatmap-label">Central School</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell slow"></div>
+                        <div class="heatmap-cell slow"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                    </div>
+                </div>
+                <div class="heatmap-row">
+                    <div class="heatmap-label">East Campus</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                        <div class="heatmap-cell down"></div>
+                    </div>
+                </div>
+                <div class="heatmap-row">
+                    <div class="heatmap-label">West Campus</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell slow"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                    </div>
+                </div>
+                <div class="heatmap-row">
+                    <div class="heatmap-label">Admin Building</div>
+                    <div class="heatmap-cells">
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                        <div class="heatmap-cell ok"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LOCATIONS STATUS -->
+        <div class="section">
+            <h2>📍 Campus Locations Status</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9em;">
+                <strong>Real-time monitoring of all campus locations across the district</strong>
+            </p>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.85em; line-height: 1.5;">
+                • <strong style="color: #fff;">Status Indicator:</strong> <span style="color: #10b981;">●</span> = Online | <span style="color: #ef4444;">●</span> = Offline<br>
+                • <strong style="color: #fff;">IP Address:</strong> The network address of each location<br>
+                • <strong style="color: #fff;">Latency:</strong> Response time in milliseconds (lower is better)<br>
+                • <strong style="color: #fff;">Bandwidth:</strong> Current network throughput and utilization<br>
+                • <strong style="color: #fff;">Uptime %:</strong> Percentage of successful checks over time
+            </p>
+            <p style="color: #10b981; margin-bottom: 15px; font-size: 0.85em; font-weight: 600;">
+                ✅ Real ICMP ping monitoring powered by backend server
+            </p>
+            <div class="schools-grid">
+                <div class="school-card">
+                    <div class="school-name">North Campus <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.10.1</div>
+                    <div class="school-detail">Latency: 12ms</div>
+                    <div class="school-detail">Bandwidth: 847 Mbps (85%)</div>
+                    <div class="school-detail">Uptime: 99.8%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">South High School <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.11.1</div>
+                    <div class="school-detail">Latency: 8ms</div>
+                    <div class="school-detail">Bandwidth: 234 Mbps (23%)</div>
+                    <div class="school-detail">Uptime: 99.7%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">Central School <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.12.1</div>
+                    <div class="school-detail">Latency: 15ms</div>
+                    <div class="school-detail">Bandwidth: 456 Mbps (46%)</div>
+                    <div class="school-detail">Uptime: 98.9%</div>
+                </div>
+                
+                <div class="school-card offline">
+                    <div class="school-name">East High School <span class="badge-offline">● OFFLINE</span></div>
+                    <div class="school-detail">IP: 192.168.13.1</div>
+                    <div class="school-detail">Latency: TIMEOUT</div>
+                    <div class="school-detail">Bandwidth: 0 Mbps</div>
+                    <div class="school-detail">Last seen: 2 hours ago</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">West Junior High <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.14.1</div>
+                    <div class="school-detail">Latency: 18ms</div>
+                    <div class="school-detail">Bandwidth: 312 Mbps (31%)</div>
+                    <div class="school-detail">Uptime: 99.5%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">Admin Building <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.15.1</div>
+                    <div class="school-detail">Latency: 9ms</div>
+                    <div class="school-detail">Bandwidth: 123 Mbps (12%)</div>
+                    <div class="school-detail">Uptime: 99.9%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- DNS SERVERS -->
+        <div class="section">
+            <h2>🖥️ DNS & Infrastructure Servers</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9em;">
+                <strong>Critical district infrastructure: DNS, DHCP, and SMTP servers</strong>
+            </p>
+            <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.85em; line-height: 1.5;">
+                • <strong style="color: #06b6d4;">[DNS + DHCP]</strong> = Servers providing both DNS resolution AND IP address assignment (load-balanced)<br>
+                • <strong style="color: #f59e0b;">[DNS]</strong> = Domain Name System servers that convert website names to IP addresses<br>
+                • <strong style="color: #ec4899;">[SMTP]</strong> = Simple Mail Transfer Protocol server handling outgoing email<br>
+                • <strong style="color: #fff;">Core Router:</strong> Central network hub connecting all locations<br>
+                • <strong style="color: #fff;">Note:</strong> These servers use specialized protocols (DNS/SMTP), not HTTP
+            </p>
+            <div class="schools-grid">
+                <div class="school-card">
+                    <div class="school-name">DNS Server 1 <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.10</div>
+                    <div class="school-detail">Latency: 2ms</div>
+                    <div class="school-detail">Uptime: 100%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">DNS Server 2 <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.11</div>
+                    <div class="school-detail">Latency: 2ms</div>
+                    <div class="school-detail">Uptime: 100%</div>
+                </div>
+                
+                <div class="school-card offline">
+                    <div class="school-name">DNS Server 3 <span class="badge-offline">● OFFLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.12</div>
+                    <div class="school-detail">Latency: TIMEOUT</div>
+                    <div class="school-detail">Last seen: 45 min ago</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">DNS Server 4 <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.13</div>
+                    <div class="school-detail">Latency: 2ms</div>
+                    <div class="school-detail">Uptime: 99.9%</div>
+                </div>
+                
+                <div class="school-card offline">
+                    <div class="school-name">DNS Server 5 <span class="badge-offline">● OFFLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.14</div>
+                    <div class="school-detail">Latency: TIMEOUT</div>
+                    <div class="school-detail">Last seen: 20 min ago</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">DNS Server 6 <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 10.0.1.15</div>
+                    <div class="school-detail">Latency: 2ms</div>
+                    <div class="school-detail">Uptime: 100%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">SMTP Server <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 10.0.2.50</div>
+                    <div class="school-detail">Latency: 3ms</div>
+                    <div class="school-detail">Uptime: 99.8%</div>
+                </div>
+                
+                <div class="school-card">
+                    <div class="school-name">District Core <span class="badge-online">● ONLINE</span></div>
+                    <div class="school-detail">IP: 192.168.1.1</div>
+                    <div class="school-detail">Latency: 5ms</div>
+                    <div class="school-detail">Bandwidth: 2.1 Gbps (21%)</div>
+                    <div class="school-detail">Uptime: 100%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: var(--bg-section); padding: 20px; border-radius: 10px; margin-top: 30px; text-align: center; border-top: 3px solid #06b6d4;">
+            <div style="color: var(--text-primary); font-weight: 600; font-size: 1.1em; margin-bottom: 8px;">
+                🛡️ Network Guardian V2.1
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px;">
+                Professional Network Monitoring Dashboard
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.85em;">
+                Free & Open Source | MIT License
+            </div>
+        </div>
+    </div>
+    
+    <!-- GitHub Button -->
+    <a href="https://github.com/yourusername/network-guardian" class="github-btn" target="_blank">
+        ⭐ Star on GitHub
+    </a>
+    
+    <script>
+        // Settings toggle
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.toggle('hidden');
+        }
+        
+        // Initialize map with school locations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Anaheim, CA coordinates
+            const map = L.map('map').setView([33.8366, -117.9143], 12);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+            
+            // School locations (fake coordinates around Anaheim)
+            const locations = [
+                {name: 'North Campus', lat: 33.8566, lng: -117.9243, status: 'online'},
+                {name: 'South High School', lat: 33.8166, lng: -117.9043, status: 'online'},
+                {name: 'Central School', lat: 33.8366, lng: -117.9343, status: 'online'},
+                {name: 'East High School', lat: 33.8266, lng: -117.8943, status: 'offline'},
+                {name: 'West Junior High', lat: 33.8466, lng: -117.9443, status: 'online'},
+                {name: 'Admin Building', lat: 33.8366, lng: -117.9143, status: 'online'},
+                {name: 'District Core', lat: 33.8366, lng: -117.9143, status: 'online'}
+            ];
+            
+            // Add markers
+            locations.forEach(loc => {
+                const color = loc.status === 'online' ? 'green' : 'red';
+                const icon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+                    iconSize: [20, 20]
+                });
+                
+                L.marker([loc.lat, loc.lng], {icon: icon})
+                    .bindPopup(`<b>${loc.name}</b><br>Status: ${loc.status.toUpperCase()}`)
+                    .addTo(map);
+            });
+        });
+        
+        console.log('%c🌐 Network Guardian Demo', 'color: #3b82f6; font-size: 24px; font-weight: bold;');
+        console.log('%cBased on AUHSD Network Guardian', 'color: #10b981; font-size: 14px;');
+        console.log('%cDownload: https://github.com/yourusername/network-guardian', 'color: #06b6d4; font-size: 14px;');
+    </script>
+</body>
+</html>
